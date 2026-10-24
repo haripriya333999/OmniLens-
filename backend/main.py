@@ -17,6 +17,12 @@ from detector import (
     normalize_object_query,
 )
 from ocr import EasyOcrEngine
+from utils.image_preprocessing import (
+    estimate_blur_and_lighting,
+    enhance_for_ocr,
+    get_opencv5_version,
+)
+from safepath_tracker import SafePathTracker
 
 app = FastAPI(
     title="OmniLens Vision Assistance API",
@@ -36,6 +42,7 @@ app.add_middleware(
 # Initialize models once at startup
 yolo_detector = YoloDetector()
 ocr_engine = EasyOcrEngine()
+safepath_tracker = SafePathTracker(suppression_cooldown_sec=8.0)
 
 def load_image_from_upload(upload_file: UploadFile) -> Image.Image:
     if not upload_file.content_type or not upload_file.content_type.startswith("image/"):
@@ -70,11 +77,12 @@ def get_health():
     
     return HealthResponse(
         status=overall_status,
-        model_name=f"Ultralytics {yolo_detector.model_name} + EasyOCR",
+        model_name=f"Ultralytics {yolo_detector.model_name} + EasyOCR + OpenCV 5",
         detector_ready=is_detector_ready,
         ocr_ready=is_ocr_ready,
         supported_classes_count=len(COCO_CLASSES),
-        version="1.1.0"
+        version="1.1.0",
+        opencv_version=get_opencv5_version()
     )
 
 @app.get("/models")
@@ -122,6 +130,7 @@ async def describe_surroundings(
     confidence: float = Form(0.30)
 ):
     image = load_image_from_upload(file)
+    opencv_quality = estimate_blur_and_lighting(image)
     detections, elapsed_ms = yolo_detector.detect(image, min_confidence=confidence)
     scene_description = yolo_detector.describe_scene(detections)
     
@@ -132,7 +141,9 @@ async def describe_surroundings(
         scene_description=scene_description,
         total_objects_count=len(detections),
         processing_time_ms=elapsed_ms,
-        model_status=f"Ultralytics {yolo_detector.model_name}" if yolo_detector.is_ready else "Model Not Initialized"
+        model_status=f"Ultralytics {yolo_detector.model_name}" if yolo_detector.is_ready else "Model Not Initialized",
+        opencv_version=get_opencv5_version(),
+        opencv_quality=opencv_quality
     )
 
 @app.post("/find", response_model=FindResponse)
@@ -154,10 +165,12 @@ async def find_object(
             matches=[],
             spoken_summary=speech,
             processing_time_ms=1,
-            model_status="Query Filter"
+            model_status="Query Filter",
+            opencv_version=get_opencv5_version()
         )
 
     image = load_image_from_upload(file)
+    opencv_quality = estimate_blur_and_lighting(image)
     # Detect using an adaptive floor so candidates near the boundary are not silently dropped by YOLO NMS
     effective_floor = max(0.08, min(confidence, 0.15))
     detections, elapsed_ms = yolo_detector.detect(image, min_confidence=effective_floor)
@@ -201,7 +214,9 @@ async def find_object(
         confidence=conf,
         spoken_summary=speech,
         processing_time_ms=elapsed_ms,
-        model_status=f"Ultralytics {yolo_detector.model_name}" if yolo_detector.is_ready else "Model Not Initialized"
+        model_status=f"Ultralytics {yolo_detector.model_name}" if yolo_detector.is_ready else "Model Not Initialized",
+        opencv_version=get_opencv5_version(),
+        opencv_quality=opencv_quality
     )
 
 @app.post("/ocr", response_model=OCRResponse)
@@ -209,6 +224,7 @@ async def read_text(
     file: UploadFile = File(...)
 ):
     image = load_image_from_upload(file)
+    opencv_quality = estimate_blur_and_lighting(image)
     text, lines, elapsed_ms, ready, status_msg = ocr_engine.extract_text(image)
     
     word_count = len(text.split()) if text else 0
@@ -224,8 +240,60 @@ async def read_text(
         word_count=word_count,
         processing_time_ms=elapsed_ms,
         engine_ready=ready,
-        model_status=status_msg
+        model_status=status_msg,
+        opencv_version=get_opencv5_version(),
+        opencv_quality=opencv_quality
     )
+
+@app.post("/safepath")
+async def analyze_safepath(
+    file: UploadFile = File(...),
+    invert_lr: bool = Form(False),
+    confidence: float = Form(0.30)
+):
+    image = load_image_from_upload(file)
+    opencv_quality = estimate_blur_and_lighting(image)
+    
+    # If severe blur, reject per SafePath specification
+    is_blurry = opencv_quality.get("is_blurry", False)
+    blur_score = opencv_quality.get("laplacian_variance", 0.0)
+    
+    if is_blurry and blur_score < 35.0:
+        return {
+            "success": True,
+            "path_status": "unclear_view",
+            "spoken_alert": "The camera view is too blurry to assess your walking path safely. Please hold still.",
+            "should_speak": True,
+            "obstacles": [],
+            "primary_obstacle": None,
+            "opencv_version": get_opencv5_version(),
+            "opencv_quality": opencv_quality,
+            "tracked_count": 0,
+            "safety_disclaimer": "SafePath is an assistive awareness aid and not a replacement for a cane, guide dog, or mobility training."
+        }
+        
+    detections, elapsed_ms = yolo_detector.detect(image, min_confidence=confidence)
+    w, h = image.size
+    tracker_result = safepath_tracker.update(
+        detections,
+        img_width=float(w),
+        img_height=float(h),
+        invert_lr=invert_lr
+    )
+    
+    return {
+        "success": True,
+        "path_status": tracker_result["path_status"],
+        "spoken_alert": tracker_result["spoken_alert"],
+        "should_speak": tracker_result["should_speak"],
+        "obstacles": tracker_result["obstacles"],
+        "primary_obstacle": tracker_result["primary_obstacle"],
+        "tracked_count": tracker_result["tracked_count"],
+        "processing_time_ms": elapsed_ms,
+        "opencv_version": get_opencv5_version(),
+        "opencv_quality": opencv_quality,
+        "safety_disclaimer": "SafePath is an assistive awareness aid and not a replacement for a cane, guide dog, or mobility training."
+    }
 
 if __name__ == "__main__":
     import uvicorn

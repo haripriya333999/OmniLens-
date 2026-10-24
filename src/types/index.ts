@@ -25,6 +25,31 @@ export interface Detection {
   };
 }
 
+export interface OpenCVQuality {
+  opencv_version: string;
+  is_opencv_5: boolean;
+  width: number;
+  height: number;
+  blur_score: number;
+  laplacian_variance?: number;
+  is_blurry: boolean;
+  mean_luminance: number;
+  contrast_std: number;
+  glare_ratio: number;
+  glare_detected: boolean;
+  is_too_dark: boolean;
+  is_low_light?: boolean;
+  is_overexposed: boolean;
+  clahe_applied: boolean;
+  low_light_applied?: boolean;
+  enhancement_type?: string;
+  speech_guidance: string;
+  processing_time_ms: number;
+  enhanced_image?: string | null;
+}
+
+export type OpenCVQualityMetrics = OpenCVQuality;
+
 export interface DescribeResponse {
   success: boolean;
   message: string;
@@ -38,6 +63,8 @@ export interface DescribeResponse {
   model_status: string;
   lighting_level?: string;
   lighting_advice?: string;
+  opencv_version?: string;
+  opencv_quality?: OpenCVQuality;
 }
 
 export interface FindResponse {
@@ -58,6 +85,10 @@ export interface FindResponse {
   sub_threshold_candidates?: Detection[];
   threshold_used?: number;
   has_sub_threshold?: boolean;
+  agentic_guidance?: string;
+  search_attempt?: number;
+  opencv_version?: string;
+  opencv_quality?: OpenCVQuality;
 }
 
 export interface OCRLine {
@@ -76,6 +107,8 @@ export interface OCRResponse {
   processing_time_ms: number;
   engine_ready: boolean;
   model_status: string;
+  opencv_version?: string;
+  opencv_quality?: OpenCVQuality;
 }
 
 export interface HealthResponse {
@@ -86,9 +119,48 @@ export interface HealthResponse {
   gemini_vision_active?: boolean;
   supported_classes_count: number | string;
   version: string;
+  opencv_version?: string;
+  opencv5_ready?: boolean;
 }
 
-export type ActiveTask = 'describe' | 'find' | 'read' | 'settings' | 'about';
+export type ActiveTask = 'describe' | 'find' | 'read' | 'safepath' | 'live' | 'settings' | 'about';
+
+export type ObstacleSector = 'left' | 'center' | 'right';
+export type ObstacleProximity = 'immediate_path' | 'approaching' | 'peripheral';
+
+export interface SafePathObstacle {
+  id: string;
+  trackId: number;
+  label: string;
+  confidence: number;
+  box: BoundingBox;
+  sector: ObstacleSector;       // left, center, right
+  normalizedXCenter: number;   // 0.0 - 1.0
+  normalizedYMax: number;      // 0.0 - 1.0 (how close to bottom/floor)
+  proximity: ObstacleProximity; // immediate_path, approaching, peripheral
+  isFloorLevel: boolean;       // bags, shoes, boxes, chairs on floor
+  alertText: string;           // e.g. "Potential obstacle visible ahead, slightly to your left"
+  persistenceFrames: number;   // consecutive frames seen
+  isNewTrack: boolean;
+}
+
+export interface SafePathResponse {
+  success: boolean;
+  message: string;
+  obstacles: SafePathObstacle[];
+  primary_obstacle?: SafePathObstacle | null;
+  spoken_alert: string;        // Concise prioritized speech
+  should_speak: boolean;       // False if duplicate suppressed
+  path_status: 'clear_view' | 'obstacles_detected' | 'caution_unclear' | 'low_light_enhanced';
+  opencv_version: string;
+  opencv_quality?: OpenCVQuality;
+  low_light_applied: boolean;
+  enhancement_type?: 'none' | 'clahe_lab' | 'gamma_correction' | 'bilateral_denoise' | 'gamma_and_clahe';
+  processing_time_ms: number;
+  model_status: string;
+  tracked_count: number;
+  safety_disclaimer: string;
+}
 
 export type EngineMode = 'gemini-vision' | 'python-fastapi' | 'web-ml';
 

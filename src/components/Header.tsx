@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Sliders, HelpCircle, Eye, Search, FileText, Cpu, ChevronDown } from 'lucide-react';
+import { Sliders, HelpCircle, Eye, Search, FileText, Cpu, ChevronDown, Footprints } from 'lucide-react';
 import { ActiveTask, EngineMode } from '../types';
 
 interface HeaderProps {
@@ -104,10 +104,47 @@ export const Header: React.FC<HeaderProps> = ({
             <FileText className="w-4 h-4" />
             <span>Read Text</span>
           </button>
+
+          <button
+            onClick={() => onSelectTask('safepath')}
+            className={`whitespace-nowrap shrink-0 transition-all py-2 px-3.5 rounded-xl flex items-center gap-2 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6845C2] ${
+              activeTask === 'safepath'
+                ? 'bg-[#087F73] text-white font-bold shadow-sm'
+                : 'text-white/80 hover:text-white hover:bg-white/10'
+            }`}
+            aria-current={activeTask === 'safepath' ? 'page' : undefined}
+            aria-label="SafePath Walking Path Awareness"
+          >
+            <Footprints className="w-4 h-4 text-[#57D6C5]" />
+            <span>SafePath</span>
+          </button>
+
+          <button
+            onClick={() => onSelectTask('live')}
+            className={`whitespace-nowrap shrink-0 transition-all py-2 px-3.5 rounded-xl flex items-center gap-2 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6845C2] ${
+              activeTask === 'live'
+                ? 'bg-[#087F73] text-white font-bold shadow-sm'
+                : 'text-white/80 hover:text-white hover:bg-white/10'
+            }`}
+            aria-current={activeTask === 'live' ? 'page' : undefined}
+            aria-label="Live Detection Stream"
+          >
+            <span className="w-2 h-2 rounded-full bg-[#57D6C5] animate-pulse" />
+            <span>Live Stream</span>
+          </button>
         </nav>
 
-        {/* Right: Help/More & Accessibility Settings */}
+        {/* Right: Showcase Return, Help/More & Accessibility Settings */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {onGoHome && (
+            <button
+              onClick={onGoHome}
+              className="py-1.5 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs transition-colors hidden sm:flex items-center gap-1.5 cursor-pointer"
+              title="Return to Public Showcase Landing Page"
+            >
+              <span>Showcase Site</span>
+            </button>
+          )}
           {/* More Dropdown (Model info, backend mode) */}
           <div className="relative" ref={moreMenuRef}>
             <button

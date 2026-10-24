@@ -131,9 +131,58 @@ class SpeechService {
 
   public repeat(): void {
     if (this.lastSpokenText) {
-      this.speak(this.lastSpokenText);
+      this.speak(this.lastSpokenText, 'interrupt');
     }
   }
+
+  public pause(): void {
+    if (this.synth && this.synth.speaking && !this.synth.paused) {
+      this.synth.pause();
+    }
+    if (this.currentAudio && !this.currentAudio.paused) {
+      this.currentAudio.pause();
+    }
+  }
+
+  public resume(): void {
+    if (this.synth && this.synth.paused) {
+      this.synth.resume();
+    }
+    if (this.currentAudio && this.currentAudio.paused) {
+      this.currentAudio.play();
+    }
+  }
+
+  public isPaused(): boolean {
+    return Boolean(this.synth?.paused || (this.currentAudio && this.currentAudio.paused && this.currentAudio.currentTime > 0));
+  }
+
+  /**
+   * Speak background / live alert with duplicate suppression
+   */
+  public speakLiveAlert(text: string, cooldownMs: number = 7000): boolean {
+    if (!text || !text.trim()) return false;
+    const now = Date.now();
+    const clean = text.trim().toLowerCase();
+
+    // Check duplicate suppression
+    if (this.lastSpokenLiveText === clean && (now - this.lastSpokenLiveTime) < cooldownMs) {
+      return false; // suppressed duplicate
+    }
+
+    // Do not talk over an active direct command announcement
+    if (this.isSpeaking()) {
+      return false;
+    }
+
+    this.lastSpokenLiveText = clean;
+    this.lastSpokenLiveTime = now;
+    this.speak(text, 'interrupt');
+    return true;
+  }
+
+  private lastSpokenLiveText: string = '';
+  private lastSpokenLiveTime: number = 0;
 
   public stop(): void {
     if (this.synth) {

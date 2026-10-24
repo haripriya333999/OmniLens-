@@ -173,7 +173,7 @@ export const FindObjectView: React.FC<FindObjectViewProps> = ({
     }
   };
 
-  const handleRunFind = async (targetQuery: string = query) => {
+  const handleRunFind = async (targetQuery: string = query, overrideConfidence?: number) => {
     if (!selectedImage || !imageElementRef.current) {
       setError('Please provide or capture an image first.');
       return;
@@ -185,11 +185,12 @@ export const FindObjectView: React.FC<FindObjectViewProps> = ({
     setIsLoading(true);
     setError(null);
     try {
+      const effectiveConf = typeof overrideConfidence === 'number' ? overrideConfidence : confidence;
       const response = await apiService.findObject(
         imageElementRef.current,
         targetQuery.trim(),
         activeFile,
-        confidence,
+        effectiveConf,
         invertLeftRight
       );
 
@@ -502,6 +503,48 @@ export const FindObjectView: React.FC<FindObjectViewProps> = ({
                   <blockquote className="text-base font-bold text-[#392743] leading-relaxed p-3.5 bg-white/90 rounded-xl border-l-4 border-[#7353B5]">
                     "{result.spoken_summary}"
                   </blockquote>
+
+                  {/* Agentic Vision Re-aiming Guidance Card */}
+                  {result.agentic_guidance && (
+                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-2">
+                      <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                        <Compass className="w-4 h-4 text-amber-700" />
+                        <span>Agentic Vision Re-aiming Guidance:</span>
+                      </div>
+                      <p className="text-amber-950 font-medium leading-relaxed">
+                        {result.agentic_guidance}
+                      </p>
+
+                      {!result.found && (
+                        <div className="pt-1 flex flex-wrap gap-2">
+                          <button
+                            onClick={() => {
+                              speechService.speak('Checking view again. Hold camera steady.');
+                              handleRunFind();
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-amber-700 hover:bg-amber-800 text-white font-bold text-xs flex items-center gap-1 cursor-pointer shadow-2xs"
+                          >
+                            <Search className="w-3.5 h-3.5" />
+                            <span>Re-aim & Check Again</span>
+                          </button>
+
+                          {result.has_sub_threshold && result.sub_threshold_candidates && result.sub_threshold_candidates.length > 0 && (
+                            <button
+                              onClick={() => {
+                                const newThresh = Math.max(0.10, Math.floor(result.sub_threshold_candidates![0].confidence * 100) / 100);
+                                setConfidence(newThresh);
+                                speechService.speak(`Sensitivity lowered to ${Math.round(newThresh * 100)} percent. Searching again.`);
+                                setTimeout(() => handleRunFind(undefined, newThresh), 200);
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-white border border-amber-300 hover:bg-amber-100 text-amber-950 font-bold text-xs cursor-pointer shadow-2xs"
+                            >
+                              <span>Lower Sensitivity to {Math.round(result.sub_threshold_candidates[0].confidence * 100)}%</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {result.found && result.matches.length > 0 && (
                     <div className="pt-2 border-t border-[#392743]/10 space-y-2">

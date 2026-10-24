@@ -3,6 +3,7 @@ import {
   FindResponse,
   OCRResponse,
   HealthResponse,
+  SafePathResponse,
   EngineMode,
   Detection,
   SUPPORTED_EVERYDAY_CLASSES,
@@ -65,12 +66,14 @@ class ApiService {
         const data = await res.json();
         return {
           status: 'healthy',
-          model_name: data.model_name || 'Gemini 3.8 Flash High-Precision Vision',
+          model_name: data.model_name || 'Gemini Flash-Lite Cascade (High-Precision Vision & OCR)',
           detector_ready: true,
           ocr_ready: true,
           gemini_vision_active: Boolean(data.gemini_vision_active),
           supported_classes_count: 'Universal Open-Vocabulary (Doors, Windows, Fans, Gestures, Room & Signs)',
-          version: data.version || '3.1.0',
+          version: data.version || '3.2.0',
+          opencv_version: data.opencv_version || '5.0.0',
+          opencv5_ready: Boolean(data.opencv5_ready ?? true),
         };
       }
     } catch (e) {
@@ -150,9 +153,11 @@ class ApiService {
             visible_text: data.visible_text || '',
             total_objects_count: data.detections.length,
             processing_time_ms: data.processing_time_ms,
-            model_status: data.model_status || 'Gemini 3.1 Flash-Lite (Low-Latency Vision)',
+            model_status: data.model_status || 'Gemini Flash-Lite Cascade + OpenCV 5',
             lighting_level: data.lighting_level,
             lighting_advice: data.lighting_advice,
+            opencv_version: data.opencv_version || '5.0.0',
+            opencv_quality: data.opencv_quality,
           };
         } else {
           const errData = await res.json().catch(() => ({}));
@@ -258,10 +263,16 @@ class ApiService {
             }
           } else if (subThresholdCandidates.length > 0) {
             const bestSub = subThresholdCandidates[0];
-            spoken = `No ${cleanQuery} was found above the ${Math.round(minConfidence * 100)}% threshold, but ${subThresholdCandidates.length} candidate was detected at ${Math.round(bestSub.confidence * 100)}% confidence. Lower the sensitivity slider to inspect.`;
+            spoken = `No clear ${cleanQuery} above ${Math.round(minConfidence * 100)}% threshold, but detected a candidate at ${Math.round(bestSub.confidence * 100)}% confidence ${bestSub.sideDirection || 'in view'}. Move camera slightly closer or lower sensitivity.`;
           } else {
-            spoken = `No ${cleanQuery} was detected in this view at the current sensitivity.`;
+            spoken = `I can't see a ${cleanQuery} clearly in this view. Slowly move the camera to your right, or tilt slightly downward, and re-scan.`;
           }
+
+          const agenticGuidance = found
+            ? `Target confirmed. Re-aim toward ${matches[0].sideDirection || 'center'} to center object.`
+            : subThresholdCandidates.length > 0
+            ? `Potential candidate found at ${Math.round(subThresholdCandidates[0].confidence * 100)}% confidence. Move 1-2 feet closer or lower the sensitivity slider.`
+            : `I can't see a ${cleanQuery} in this view. Slowly pan the camera 30 degrees to your right or tilt toward the table.`;
 
           return {
             success: true,
@@ -269,7 +280,7 @@ class ApiService {
               ? `Found ${matches.length} instance(s) of "${cleanQuery}".`
               : subThresholdCandidates.length > 0
               ? `Detected ${subThresholdCandidates.length} candidate(s) below ${Math.round(minConfidence * 100)}% threshold.`
-              : `No "${cleanQuery}" detected.`,
+              : `No "${cleanQuery}" detected in current frame.`,
             requested_object: cleanQuery,
             is_category_supported: true,
             found,
@@ -283,8 +294,11 @@ class ApiService {
             vertical_position: matches.length > 0 ? matches[0].verticalPosition : (subThresholdCandidates.length > 0 ? subThresholdCandidates[0].verticalPosition : undefined),
             confidence: matches.length > 0 ? matches[0].confidence : (subThresholdCandidates.length > 0 ? subThresholdCandidates[0].confidence : undefined),
             spoken_summary: spoken,
+            agentic_guidance: agenticGuidance,
             processing_time_ms: data.processing_time_ms,
-            model_status: data.model_status || 'Gemini Vision Cascade',
+            model_status: data.model_status || 'Gemini Vision Cascade + OpenCV 5',
+            opencv_version: data.opencv_version || '5.0.0',
+            opencv_quality: data.opencv_quality,
           };
         } else {
           const errData = await res.json().catch(() => ({}));
@@ -425,6 +439,82 @@ class ApiService {
       model_status: 'OCR Unavailable',
     };
   }
+
+  /**
+   * SafePath: Walking Path Awareness with OpenCV 5 Preprocessing & Localization
+   */
+  public async analyzeSafePath(
+    input: HTMLImageElement | File | Blob,
+    invertLeftRight: boolean = false,
+    sensitivity: number = 0.25
+  ): Promise<SafePathResponse> {
+    let dataUrl: string;
+    let fileBlob: Blob;
+
+    if (input instanceof HTMLImageElement) {
+      dataUrl = imageElementToDataUrl(input);
+      fileBlob = await imageElementToBlob(input);
+    } else {
+      dataUrl = await blobToDataUrl(input);
+      fileBlob = input;
+    }
+
+    // Call server SafePath endpoint
+    try {
+      const res = await fetch('/api/safepath/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image: dataUrl,
+          invertLeftRight,
+          sensitivity,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        return data;
+      }
+    } catch (e) {
+      console.warn('SafePath server call error, checking fallback:', e);
+    }
+
+    // Python FastAPI fallback if configured
+    if (this.engineMode === 'python-fastapi') {
+      try {
+        const formData = new FormData();
+        formData.append('file', fileBlob, 'capture.jpg');
+        formData.append('confidence', sensitivity.toString());
+        formData.append('invert_lr', invertLeftRight ? 'true' : 'false');
+        const res = await fetch(`${this.backendUrl}/safepath`, {
+          method: 'POST',
+          body: formData,
+        });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch (err) {
+        console.warn('Python backend SafePath call error:', err);
+      }
+    }
+
+    return {
+      success: false,
+      message: 'SafePath vision service is busy. Hold camera steady and retry.',
+      obstacles: [],
+      primary_obstacle: null,
+      spoken_alert: 'The camera view is temporarily unavailable. Check camera position.',
+      should_speak: true,
+      path_status: 'caution_unclear',
+      opencv_version: '5.0.0',
+      low_light_applied: false,
+      processing_time_ms: 0,
+      model_status: 'Service Unavailable',
+      tracked_count: 0,
+      safety_disclaimer:
+        'SafePath is an assistive awareness aid, not a collision-avoidance system. Always use your cane, guide dog, or established mobility practices.',
+    };
+  }
 }
 
 function imageElementToDataUrl(img: HTMLImageElement): string {
@@ -450,6 +540,15 @@ async function imageElementToBlob(img: HTMLImageElement): Promise<Blob> {
     canvas.toBlob((blob) => {
       resolve(blob || new Blob([]));
     }, 'image/jpeg', 0.95);
+  });
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
   });
 }
 

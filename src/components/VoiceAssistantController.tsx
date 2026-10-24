@@ -253,10 +253,49 @@ export const VoiceAssistantController: React.FC<VoiceAssistantControllerProps> =
       return;
     }
 
-    // 6. Help
+    // 6. SafePath Walking Path Awareness
+    if (
+      text.includes('safe path') ||
+      text.includes('safepath') ||
+      text.includes('walking') ||
+      text.includes('obstacle') ||
+      text.includes('watch path') ||
+      text.includes('path') ||
+      text.includes('walk')
+    ) {
+      onSelectTask('safepath');
+      onRunAction('safepath');
+      speechService.speak('Starting SafePath walking path awareness.');
+      return;
+    }
+
+    // 7. Live Detection
+    if (
+      text.includes('live') ||
+      text.includes('continuous') ||
+      text.includes('stream') ||
+      text.includes('monitor')
+    ) {
+      onSelectTask('live');
+      onRunAction('live');
+      speechService.speak('Starting live detection stream.');
+      return;
+    }
+
+    // 8. Pause & Resume
+    if (text.includes('pause')) {
+      speechService.pause();
+      return;
+    }
+    if (text.includes('resume')) {
+      speechService.resume();
+      return;
+    }
+
+    // 9. Help
     if (text.includes('help') || text.includes('instructions')) {
       speechService.speak(
-        'Voice commands: Say describe surroundings, find my bottle, read text, repeat that, or stop.'
+        'Voice commands: Say describe surroundings, find my bottle, read text, safe path, live detection, repeat, or stop.'
       );
     }
   };
@@ -295,6 +334,14 @@ export const VoiceAssistantController: React.FC<VoiceAssistantControllerProps> =
         e.preventDefault();
         onSelectTask('read');
         speechService.speak('Switched to Read Text Aloud.');
+      } else if (key === 'p' || key === 'w' || key === '4') {
+        e.preventDefault();
+        onSelectTask('safepath');
+        speechService.speak('Switched to SafePath Walking Awareness.');
+      } else if (key === 'l' || key === '5') {
+        e.preventDefault();
+        onSelectTask('live');
+        speechService.speak('Switched to Live Detection Stream.');
       }
     };
 
@@ -356,6 +403,7 @@ export const VoiceAssistantController: React.FC<VoiceAssistantControllerProps> =
 
             <p className="text-xs sm:text-sm text-white/80 mt-1 leading-relaxed">
               Try saying: <strong className="text-white">“Describe surroundings”</strong>,{' '}
+              <strong className="text-white">“SafePath”</strong>,{' '}
               <strong className="text-white">“Find my bottle”</strong>, or{' '}
               <strong className="text-white">“Read text”</strong>.
             </p>
@@ -462,6 +510,12 @@ export const VoiceAssistantController: React.FC<VoiceAssistantControllerProps> =
               R
             </kbd>{' '}
             <span className="text-white/70">Read Text</span>
+          </div>
+          <div className="p-2.5 rounded-xl bg-white/5 border border-white/10">
+            <kbd className="px-1.5 py-0.5 rounded bg-white/15 text-[11px] font-mono text-white font-bold">
+              P
+            </kbd>{' '}
+            <span className="text-white/70">SafePath</span>
           </div>
           <div className="p-2.5 rounded-xl bg-white/5 border border-white/10">
             <kbd className="px-1.5 py-0.5 rounded bg-white/15 text-[11px] font-mono text-white font-bold">

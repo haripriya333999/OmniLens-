@@ -1,4 +1,4 @@
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict, Any
 from pydantic import BaseModel, Field
 
 class BoundingBox(BaseModel):
@@ -24,6 +24,8 @@ class DescribeResponse(BaseModel):
     total_objects_count: int
     processing_time_ms: int
     model_status: str
+    opencv_version: Optional[str] = "5.0.0"
+    opencv_quality: Optional[Dict[str, Any]] = None
 
 class FindResponse(BaseModel):
     success: bool
@@ -38,6 +40,8 @@ class FindResponse(BaseModel):
     spoken_summary: str
     processing_time_ms: int
     model_status: str
+    opencv_version: Optional[str] = "5.0.0"
+    opencv_quality: Optional[Dict[str, Any]] = None
 
 class OCRLine(BaseModel):
     text: str
@@ -53,6 +57,8 @@ class OCRResponse(BaseModel):
     processing_time_ms: int
     engine_ready: bool
     model_status: str
+    opencv_version: Optional[str] = "5.0.0"
+    opencv_quality: Optional[Dict[str, Any]] = None
 
 class HealthResponse(BaseModel):
     status: str
@@ -61,6 +67,7 @@ class HealthResponse(BaseModel):
     ocr_ready: bool
     supported_classes_count: int
     version: str
+    opencv_version: str = "5.0.0"
 
 class ModelCapability(BaseModel):
     name: str
@@ -69,3 +76,4 @@ class ModelCapability(BaseModel):
     ready: bool
     supported_categories: List[str]
     description: str
+    opencv_version: Optional[str] = "5.0.0"

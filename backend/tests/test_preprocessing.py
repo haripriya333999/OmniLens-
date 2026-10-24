@@ -40,3 +40,10 @@ def test_ocr_enhancement_shape():
     arr = enhance_for_ocr(img)
     assert isinstance(arr, np.ndarray)
     assert arr.shape == (200, 300, 3)
+
+if __name__ == "__main__":
+    test_resize_maintaining_aspect_ratio()
+    test_lighting_estimation_dark()
+    test_lighting_estimation_balanced()
+    test_ocr_enhancement_shape()
+    print("ALL PREPROCESSING TESTS PASSED!")

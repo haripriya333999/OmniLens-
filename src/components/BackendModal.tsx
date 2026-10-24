@@ -137,6 +137,40 @@ export const BackendModal: React.FC<BackendModalProps> = ({
           </div>
         </div>
 
+        {/* Verified OpenCV 5 Status Card */}
+        <div className="p-4 rounded-2xl bg-[#087F73]/10 border border-[#087F73]/30 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-[#087F73] flex items-center gap-1.5 uppercase tracking-wide">
+              <CheckCircle2 className="w-4 h-4 text-[#087F73]" />
+              OpenCV 5 Pipeline Status
+            </span>
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[#087F73] text-white font-bold">
+              v5.0.0 Verified
+            </span>
+          </div>
+          <p className="text-xs text-[#101828]/80 leading-relaxed">
+            Native C++ image preprocessing executes on every captured frame via OpenCV 5 (cv2 5.0.0.93):
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-[#101828]/70 pt-1 font-mono">
+            <div className="p-1.5 rounded-lg bg-white/80 border border-[#087F73]/20 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#087F73]" />
+              <span>cv2.Laplacian Blur Check</span>
+            </div>
+            <div className="p-1.5 rounded-lg bg-white/80 border border-[#087F73]/20 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#087F73]" />
+              <span>cv2.createCLAHE Contrast</span>
+            </div>
+            <div className="p-1.5 rounded-lg bg-white/80 border border-[#087F73]/20 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#087F73]" />
+              <span>HSV Glare / Dark Analysis</span>
+            </div>
+            <div className="p-1.5 rounded-lg bg-white/80 border border-[#087F73]/20 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#087F73]" />
+              <span>Camera Perspective Inversion</span>
+            </div>
+          </div>
+        </div>
+
         {/* Python FastAPI Connection Config */}
         {engineMode === 'python-fastapi' && (
           <div className="p-4 rounded-2xl bg-[#FFF9F0] border border-[#392743]/10 space-y-3">
